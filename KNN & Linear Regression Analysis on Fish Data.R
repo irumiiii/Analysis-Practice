@@ -84,10 +84,68 @@ fish_workflow <- workflow() |>
 #Predict Testing Data
 fish_summary <- fish_workflow |>
   predict(fish_test) |>
-  bind_cols(fish_test) |>
-  metrics(truth = LC50, estimate = .pred)
+  bind_cols(fish_test) 
 
 
+#Linear Regression Analysis
+#Preprocessing
+fish_recipe_linear <- recipe(LC50~MLOGP, data = fish_train) 
 
+#Model Specification
+fish_model_linear <- linear_reg() |>
+  set_engine("lm") |>
+  set_mode("regression")
 
+#Build Workflow
+fish_workflow <- workflow() |>
+  add_recipe(fish_recipe_linear) |>
+  add_model(fish_model_linear) |>
+  fit(fish_train)
 
+#Predict on training data and visualize
+fish_preds <- fish_workflow |>
+  predict(fish_train) |>
+  bind_cols(fish_train)
+
+fish_preds_plot <- ggplot(fish_preds, aes(x = MLOGP, y = LC50)) + 
+  geom_point(alpha = 0.4) + 
+  geom_line(aes(x = MLOGP, y = .pred), colour = "red") +
+  labs(x = "Molecular Liphophilicity", y = "Lethal Compound", title = "Molecular Lipophilicity vs LC50 with Linear Regression") + 
+  theme(plot.title = element_text(size = 10)) 
+
+#Predict on testing data and visualize
+fish_test_preds <- fish_workflow |>
+  predict(fish_test) |>
+  bind_cols(fish_test)
+
+fish_test_plot <- ggplot(fish_test_preds, aes(x = MLOGP, y = LC50)) + 
+  geom_point(alpha = 0.4) + 
+  geom_line(aes(x = MLOGP, y = .pred), colour = "blue") + 
+  labs(x = "Molecular Liphophilicity", y = "Lethal Compound", title = "Molecular Lipophilicity vs LC50 with Linear Regression",
+       subtitle = "y = 2.7151 + 0.6329x") + 
+  theme(plot.title = element_text(size = 10))
+#Best fit line equation is y = 0.6329x + 2.7151
+
+#Plotting both fitted lines on same test data
+comparison_plot <- ggplot(fish_test, aes(x = MLOGP, y = LC50)) + 
+  geom_point(alpha = 0.4) + 
+  geom_line(fish_test_preds, mapping = aes(x = MLOGP, y = .pred, color = "Linear Regression")) + 
+  geom_line(fish_summary, mapping = aes(x = MLOGP, y = .pred, color = "KNN")) + 
+  labs(x = "Molecular Lipophilicity", y = "Lethal Compound", title = "Linear (blue) vs KNN (red) Predictions on Fish Test Data",
+       color = "Type of Regression") + 
+  theme(plot.title = element_text(size = 10)) + 
+  scale_colour_brewer(palette = "Set2")
+
+#Comparing KNN and Linear regression
+knn_metrics <- fish_summary |>
+  metrics(truth = LC50, estimate = .pred) |>
+  mutate(model = "KNN") 
+
+lm_metrics <- fish_test_preds |>
+  metrics(truth = LC50, estimate = .pred) |>
+  mutate(model = "Linear")
+
+comparison_metrics <- bind_rows(knn_metrics, lm_metrics) |>
+  select(!.estimator) |>
+  pivot_wider(names_from = .metric, values_from = .estimate)
+#KNN regression model is slightly better
