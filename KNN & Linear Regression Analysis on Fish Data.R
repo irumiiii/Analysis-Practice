@@ -149,4 +149,4 @@ comparison_metrics <- bind_rows(knn_metrics, lm_metrics) |>
   select(!.estimator) |>
   pivot_wider(names_from = .metric, values_from = .estimate)
 #KNN regression model is slightly better
-#checking if worked
+
