@@ -1,7 +1,8 @@
 library(tidyverse)
 library(tidymodels)
-library(NHANE)
+library(NHANES)
 library(janitor)
+library(cowplot)
 
 #Data Reading/Data Wrangling
 #Select for BMI, TotChol (total cholesterol), BPSysAve (average systolic blood pressure), Height and Weight
@@ -58,7 +59,63 @@ tot_bmi_dist100 <- ggplot(avg_chol_bmi, aes(mean_bmi)) +
   geom_histogram(binwidth = 0.5) + 
   labs(x = "Body Mass Index (BMI)", title = "Sampling Distribution of BMI (n = 100)")
 
+#Bootstrapping Practice (total cholesterol)
+#First, generate a single sample from the population (n = 500)
+tot_chol_sample <- nhanes_data |>
+  rep_sample_n(500) |>
+  ungroup() |>
+  select(tot_chol)
 
+#Bootstrap from that  (lets try 10, 100, 1000 bootstrap samples of size 50)
+boot_10 <- tot_chol_sample |>
+  rep_sample_n(size = 500, replace = TRUE, reps = 10)
+boot_100 <- tot_chol_sample |>
+  rep_sample_n(size = 500, replace = TRUE, reps = 100) 
+boot_1000 <- tot_chol_sample |>
+  rep_sample_n(size = 500, replace = TRUE, reps = 1000)
+
+#Calculating Mean Total Cholesterol of each bootstrap sample
+boot_10_means <- boot_10 |>
+  group_by(replicate) |>
+  summarize(mean_cholsterol = mean(tot_chol))
+boot_100_means <- boot_100 |>
+  group_by(replicate) |>
+  summarize(mean_cholesterol = mean(tot_chol)) 
+boot_1000_means <- boot_1000 |>
+  group_by(replicate) |>
+  summarize(mean_cholesterol = mean(tot_chol))
+
+#Histogram Visualization
+boot_10_dist <- ggplot(boot_10_means, aes(mean_cholsterol)) + 
+  geom_histogram(binwidth = 0.03) + 
+  labs(x = "Total Cholesterol", title = "Point Estimates (mean) of Boostrap Sample (n = 10)", caption = "NHANES data") + 
+  theme(text = element_text(size = 10)) 
+
+boot_100_dist <- ggplot(boot_100_means, aes(mean_cholesterol)) + 
+  geom_histogram(binwidth = 0.03) + 
+  labs(x = "Total Cholesterol", title = "Point Estimates (mean) of Boostrap Sample (n = 100)", caption = "NHANES data") + 
+  theme(text = element_text(size = 10))
+
+boot_1000_dist <- ggplot(boot_1000_means, aes(mean_cholesterol)) + 
+  geom_histogram(binwidth = 0.03) + 
+  labs(x = "Total Cholesterol", title = "Point Estimates (mean) of Boostrap Sample (n = 1000)", caption = "NHANES data") + 
+  theme(text = element_text(size = 10))
+
+plots <- plot_grid(boot_10_dist,
+                    boot_100_dist,
+                    boot_1000_dist,
+                    nrow = 3)
+
+#Getting bootstrap confidence interval (95%), (n = 1000)
+boot_1000_means |>
+  select(mean_cholesterol) |>
+  pull() |>
+  quantile(c(0.025, 0.975))
+#With 95% confidence, the true population mean for total cholesterol sits between 4.8608~5.0611
+
+#True population mean is 4.90. Indeed, it sits within the confidence levels
+nhanes_data |>
+  summarize(mean = mean(tot_chol))
 
 
 
